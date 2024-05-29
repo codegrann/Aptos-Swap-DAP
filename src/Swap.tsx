@@ -1,38 +1,33 @@
 import React, { useState } from 'react';
-import { useWallet } from '@aptos-labs/wallet-adapter-react';
-import { AptosClient, AptosAccount, TokenClient } from '@aptos-labs/aptos-sdk';
+import { AptosClient, Account, AptosConfig, Network } from '@aptos-labs/ts-sdk';
 
-const client = new AptosClient('https://fullnode.devnet.aptoslabs.com');
+const aptosConfig = new AptosConfig({ network: Network.DEVNET });
+const aptos = new AptosClient(aptosConfig);
 
 const Swap: React.FC = () => {
-  const { connect, disconnect, account } = useWallet();
   const [amount, setAmount] = useState<string>('');
   const [fromToken, setFromToken] = useState<string>('');
   const [toToken, setToToken] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
   const handleSwap = async () => {
-    if (!account) {
-      alert('Please connect your wallet first.');
-      return;
-    }
-
     try {
       setLoading(true);
-      const tokenClient = new TokenClient(client);
+      // Example of creating an account and funding it
+      const alice = Account.generate();
+      await aptos.fundAccount({ accountAddress: alice.accountAddress, amount: 100000000 });
 
-      // Swap logic
-      // 1. Check balances
-      const fromBalance = await tokenClient.getAccountBalance(account.address, fromToken);
-      if (Number(fromBalance) < Number(amount)) {
-        alert('Insufficient balance.');
-        return;
-      }
-
-      // 2. Execute swap (assuming there's a smart contract for swapping)
-      // This part should call the appropriate swap function in the smart contract
-      // Example:
-      // const txn = await tokenClient.swapTokens(account, fromToken, toToken, amount);
+      // Example of transferring APT coin
+      const bobAddress = '0xb0b';
+      const transaction = await aptos.transaction.build.simple({
+        sender: alice.accountAddress,
+        data: {
+          function: '0x1::aptos_account::transfer_coins',
+          typeArguments: ['0x1::aptos_coin::AptosCoin'],
+          functionArguments: [bobAddress, 100],
+        },
+      });
+      const pendingTransaction = await aptos.signAndSubmitTransaction({ signer: alice, transaction });
 
       alert('Swap successful!');
     } catch (error) {
@@ -45,9 +40,6 @@ const Swap: React.FC = () => {
 
   return (
     <div>
-      <button onClick={connect}>Connect Wallet</button>
-      <button onClick={disconnect}>Disconnect Wallet</button>
-      <br />
       <input
         type="text"
         placeholder="From Token"
